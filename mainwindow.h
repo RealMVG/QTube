@@ -10,8 +10,8 @@
 #include <QQuickWidget>
 #include <QPixmap>
 #include <QDebug>
+#include <QUrlQuery>
 #include <QProcess>
-#include <QTextCodec>
 #include <QRegularExpression>
 
 QT_BEGIN_NAMESPACE
@@ -35,5 +35,8 @@ private slots:
 
 private:
     Ui::MainWindow *ui;
+
+    QString getUrlType(const QString &videoUrl);
+
 };
 #endif // MAINWINDOW_H

@@ -17,30 +17,40 @@ MainWindow::MainWindow(QWidget *parent)
 #else
     qDebug() << "Unix!";
 #endif
+
     QUrl imageUrl("http://qt.digia.com/Documents/1/QtLogo.png");
     FileDownloader* downloader  = new FileDownloader(imageUrl, this);
 
     connect(ui->b_search, &QPushButton::pressed, this, &MainWindow::on_b_search_pressed);
     disconnect(ui->b_search, &QPushButton::pressed, this, &MainWindow::on_b_search_pressed);
-
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
-
 }
 
 void MainWindow::on_b_search_pressed() {
-    QString video_url = ui->e_inputURL->text();
+    QString videoUrl = ui->e_inputURL->text();
+    QString urlType = getUrlType(videoUrl);
 
-    fetchVideoTitle(video_url);
+    if (urlType == "playlist") {
+        qDebug() << "This is a playlist URL!";
+    } else if (urlType == "channel") {
+        qDebug() << "This is a channel URL!";
+    } else if (urlType == "video") {
+        qDebug() << "This is a single video URL!";
+        fetchVideoTitle(videoUrl);
+    } else {
+        qDebug() << "Unknown URL type!";
+    }
 }
 
 void MainWindow::fetchVideoTitle(const QString &videoUrl) {
+
     QProcess *process = new QProcess(this);
     process->setProgram("yt-dlp");
-    process->setArguments(QStringList() << "--quiet" << "--get-title" << videoUrl);
+    process->setArguments(QStringList() << "--quiet" << "--get-title" << "--encoding" << "utf-8" << videoUrl);
 
     connect(process, &QProcess::finished, this, [this, process, videoUrl](int exitCode, QProcess::ExitStatus exitStatus) {
         if (exitStatus == QProcess::CrashExit) {
@@ -63,6 +73,22 @@ void MainWindow::fetchVideoTitle(const QString &videoUrl) {
     });
 
     process->start();
+}
+
+QString MainWindow::getUrlType(const QString &videoUrl) {
+    QUrl url(videoUrl);
+    QUrlQuery query(url);
+
+    if (query.hasQueryItem("list")) {
+        return "playlist";
+    }
+
+    QString path = url.path();
+    if (path.contains("/channel/") || path.contains("/c/") || path.contains("/user/")) {
+        return "channel";
+    }
+
+    return "video";
 }
 
 
@@ -131,6 +157,3 @@ void FileDownloader::fileDownloaded(QNetworkReply* pReply) {
 QByteArray FileDownloader::downloadedData() const {
     return m_DownloadedData;
 }
-
-
-
