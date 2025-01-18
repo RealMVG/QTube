@@ -10,6 +10,8 @@
 #include <QQuickWidget>
 #include <QPixmap>
 #include <QDebug>
+#include <QProcess>
+#include <QTextCodec>
 #include <QRegularExpression>
 
 QT_BEGIN_NAMESPACE
@@ -28,6 +30,8 @@ public:
 
 private slots:
     void on_b_search_pressed();
+    void handleImageUrl(const QString &videoUrl);
+    void fetchVideoTitle(const QString &videoUrl);
 
 private:
     Ui::MainWindow *ui;

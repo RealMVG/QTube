@@ -13,7 +13,6 @@ CONFIG += c++17
 SOURCES += \
     main.cpp \
     mainwindow.cpp
-    ytdlp.py
 HEADERS += \
     filedownloader.h \
     mainwindow.h \
@@ -26,7 +25,7 @@ TRANSLATIONS += \
 CONFIG += lrelease
 CONFIG += embed_translations
 OTHER_FILES += \
-    ytdlp.py/
+#    ytdlp.py/
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

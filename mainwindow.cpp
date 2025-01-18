@@ -22,24 +22,60 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->b_search, &QPushButton::pressed, this, &MainWindow::on_b_search_pressed);
     disconnect(ui->b_search, &QPushButton::pressed, this, &MainWindow::on_b_search_pressed);
+
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+
 }
 
 void MainWindow::on_b_search_pressed() {
-    QString inputUrl = ui->e_inputURL->text();
-    QString outputUrl = inputUrl;
-    if (inputUrl.contains("www.youtube.com")){
-        qDebug()<< "YouTube Detected";
+    QString video_url = ui->e_inputURL->text();
+
+    fetchVideoTitle(video_url);
+}
+
+void MainWindow::fetchVideoTitle(const QString &videoUrl) {
+    QProcess *process = new QProcess(this);
+    process->setProgram("yt-dlp");
+    process->setArguments(QStringList() << "--quiet" << "--get-title" << videoUrl);
+
+    connect(process, &QProcess::finished, this, [this, process, videoUrl](int exitCode, QProcess::ExitStatus exitStatus) {
+        if (exitStatus == QProcess::CrashExit) {
+            qDebug() << "yt-dlp crashed!";
+            process->deleteLater();
+            return;
+        }
+
+        QString videoTitle = process->readAllStandardOutput().trimmed();
+        if (videoTitle.isEmpty()) {
+            qDebug() << "No title found for the video!";
+        } else {
+            qDebug() << "Video Title:" << videoTitle;
+            ui->l_vid_name->setText(videoTitle);
+        }
+
+        process->deleteLater();
+
+        handleImageUrl(videoUrl);
+    });
+
+    process->start();
+}
+
+
+void MainWindow::handleImageUrl(const QString &videoUrl) {
+    QString outputUrl = videoUrl;
+    if (videoUrl.contains("www.youtube.com")) {
+        qDebug() << "YouTube Detected";
 
         QRegularExpression regex("[?&]v=([^&][^?]+)");
-        QRegularExpressionMatch match = regex.match(inputUrl);
+        QRegularExpressionMatch match = regex.match(videoUrl);
 
-        if(match.hasMatch()){
-            QString videoId = match.captured(1); 
+        if (match.hasMatch()) {
+            QString videoId = match.captured(1);
             qDebug() << "Video ID:" << videoId;
             outputUrl = "https://img.youtube.com/vi/" + videoId + "/maxresdefault.jpg";
             qDebug() << outputUrl;
@@ -47,7 +83,6 @@ void MainWindow::on_b_search_pressed() {
             qDebug() << "Video ID not found.";
         }
     }
-
 
     QUrl imageUrl(outputUrl);
 
@@ -62,12 +97,13 @@ void MainWindow::on_b_search_pressed() {
                 qDebug() << "Image uploaded successfully!";
             } else {
                 ui->Image->setText("Error: Image cannot be loaded!");
-                qDebug() <<"Error: Image cannot be loaded!";
+                qDebug() << "Error: Image cannot be loaded!";
             }
             downloader->deleteLater();
         });
     } else {
-        ui->Image->setText("Error: Wrong URL"); qDebug() << "Error: Wrong URL";
+        ui->Image->setText("Error: Wrong URL");
+        qDebug() << "Error: Wrong URL";
     }
 }
 
