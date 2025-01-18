@@ -36,12 +36,14 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
     QMap<QString, QString> formatMap;
+    QString testres;
     QString videoTitle;
 
 private slots:
     void on_searchButton_pressed();
     void fetchVideoDetails(const QString &videoUrl);
     void loadImage(const QUrl &imageUrl);
+    void downloadAndCombine(const QString &videoUrl, const QString &videoId, const QString &audioId);
     void fetchAvailableFormats(const QString &videoUrl);
     void on_b_download_pressed();
 

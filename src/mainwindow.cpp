@@ -15,7 +15,6 @@ MainWindow::MainWindow(QWidget *parent)
 #else
     qDebug() << "Program successfully started on Unix type system!";
 #endif
-
     QUrl imageUrl("http://qt.digia.com/Documents/1/QtLogo.png");
     connect(ui->b_download, &QPushButton::pressed, this, &MainWindow::on_b_download_pressed);
     connect(ui->searchButton, &QPushButton::pressed, this, &MainWindow::on_searchButton_pressed);
@@ -29,17 +28,14 @@ MainWindow::~MainWindow()
 void MainWindow::on_b_download_pressed() {
     disconnect(ui->b_download, &QPushButton::pressed, this, &MainWindow::on_b_download_pressed);
     QProcess *downloadProcess = new QProcess(this);
-
     downloadProcess->setProgram("yt-dlp");
-    // Если yt-dlp не в системном PATH, укажите полный путь.
-    // downloadProcess->setProgram("C:/path/to/yt-dlp.exe");
 
     QString videoUrl = ui->e_inputUrl->text();
     QString savePath = QFileDialog::getSaveFileName(this, "Save Video", videoTitle, "All Files (*)");
 
     QString selectedFormat = ui->comboBoxFormats->currentText();
-
     QString formatId = extractFormatId(selectedFormat);
+
     if (formatId.isEmpty()) {
         qDebug() << "No valid format selected!";
         return;
@@ -91,15 +87,6 @@ void MainWindow::on_b_download_pressed() {
                 }
             }
         }
-
-        if (outputStr.contains("B/s")) {
-            QStringList parts = outputStr.split(" ");
-            for (const QString &part : parts) {
-                if (part.endsWith("B/s")) {
-                    qDebug() << "Download speed:" << part;
-                }
-            }
-        }
     });
 
     connect(downloadProcess, &QProcess::finished, this, [this, downloadProcess](int exitCode, QProcess::ExitStatus exitStatus) {
@@ -125,14 +112,15 @@ void MainWindow::on_searchButton_pressed() {
     QString videoUrl = ui->e_inputUrl->text();
     QString urlType = getUrlType(videoUrl);
 
-    if (urlType == "playlist") {
-        qDebug() << "This is a playlist URL!";
-    } else if (urlType == "channel") {
-        qDebug() << "This is a channel URL!";
-    } else if (urlType == "video") {
-        qDebug() << "This is a single video URL!";
+    qDebug() << "URL type = "<< urlType;
+
+    if (urlType == "video") {
         fetchVideoDetails(videoUrl);
         fetchAvailableFormats(videoUrl);
+    } else if (urlType == "playlist") {
+        qDebug() << "Playlist detected!";
+    } else if (urlType == "channel") {
+        qDebug() << "Channel detected!";
     } else {
         qDebug() << "Unknown URL type!";
     }
@@ -143,10 +131,8 @@ void MainWindow::on_searchButton_pressed() {
 void MainWindow::fetchAvailableFormats(const QString &videoUrl) {
     QProcess *formatProcess = new QProcess(this);
     formatProcess->setProgram("yt-dlp");
-    formatProcess->setArguments(QStringList() << "-F"
-                                              << videoUrl);
+    formatProcess->setArguments(QStringList() << "-F" << videoUrl);
 
-    disconnect(formatProcess, &QProcess::finished, this, nullptr);
     connect(formatProcess, &QProcess::finished, this, [this, formatProcess](int exitCode, QProcess::ExitStatus exitStatus) {
         if (exitStatus == QProcess::CrashExit) {
             qDebug() << "yt-dlp crashed while fetching formats!";
@@ -158,35 +144,107 @@ void MainWindow::fetchAvailableFormats(const QString &videoUrl) {
         QStringList outputLines = output.split("\n");
 
         QStringList formats;
-        for (const QString &line : outputLines) {
+        QMap<QString, QString> videoFormats;
+        QMap<QString, QString> audioFormats;
+        formatMap.clear();
 
+        for (const QString &line : outputLines) {
             if (line.contains("audio") || line.contains("video")) {
                 QStringList parts = line.split(QRegularExpression("\\s+"));
 
                 if (parts.size() > 4) {
                     QString formatId = parts[0];
                     QString resolution = parts[1];
-                    QString type = parts.last();
+                    QString codec = parts[2];
+                    QString type;
 
-                    QString readableFormat = resolution + " " + parts[2] + " (" + type + ")";
-                    formats.append(readableFormat);
+                    if (line.contains("video")) {
+                        type = "video";
+                    } else if (line.contains("audio")) {
+                        type = "audio";
+                    } else {
+                        continue;
+                    }
 
-                    formatMap[readableFormat] = formatId;
+                    if (parts.last().contains("webm_dash") || parts.last().contains("mp4_dash") || parts.last().contains("m4a_dash")) {
+                        continue;
+                    }
+
+                    QString readableFormat;
+                    if (type == "video") {
+                        readableFormat = resolution + " (" + codec + ")";
+                        videoFormats[readableFormat] = formatId;
+                    } else if (type == "audio") {
+                        readableFormat = codec;
+                        audioFormats[readableFormat] = formatId;
+                    }
                 }
             }
         }
 
-        if (!formats.isEmpty()) {
+        QStringList videoKeys = videoFormats.keys();
+        QStringList audioKeys = audioFormats.keys();
+        std::sort(videoKeys.begin(), videoKeys.end());
+        std::sort(audioKeys.begin(), audioKeys.end());
+
+        if (!videoKeys.isEmpty() && !audioKeys.isEmpty()) {
             ui->comboBoxFormats->clear();
-            ui->comboBoxFormats->addItems(formats);
+
+            for (const QString &videoKey : videoKeys) {
+                formats.append(videoKey + " (video only)");
+                formatMap[videoKey + " (video only)"] = videoFormats[videoKey];
+            }
+
+            for (const QString &audioKey : audioKeys) {
+                formats.append(audioKey + " (audio only)");
+                formatMap[audioKey + " (audio only)"] = audioFormats[audioKey];
+            }
+
+            for (const QString &videoKey : videoKeys) {
+                for (const QString &audioKey : audioKeys) {
+                    QString combinedFormat = videoKey + " + " + audioKey;
+
+                    combinedFormat.replace("(audio only)", "").replace("(audio)", "").trimmed();
+                    formats.append(combinedFormat);
+
+                    formatMap[combinedFormat] = videoFormats[videoKey] + "+" + audioFormats[audioKey];
+                }
+            }
+
+            ui->comboBoxFormats->addItems(formats); // Заполняем ComboBox
         } else {
-            qDebug() << "No formats found for this video!";
+            qDebug() << "No valid video or audio formats found for this video!";
         }
 
         formatProcess->deleteLater();
     });
 
     formatProcess->start();
+}
+
+
+
+
+void MainWindow::downloadAndCombine(const QString &videoUrl, const QString &videoId, const QString &audioId) {
+    QProcess *process = new QProcess(this);
+    process->setProgram("yt-dlp");
+    process->setArguments(QStringList() << "-f"
+                                        << videoId + "+" + audioId
+                                        << "-o"
+                                        << videoUrl);
+
+    connect(process, &QProcess::finished, this, [this, process](int exitCode, QProcess::ExitStatus exitStatus) {
+        if (exitStatus == QProcess::CrashExit) {
+            qDebug() << "yt-dlp crashed while downloading and combining!";
+            process->deleteLater();
+            return;
+        }
+
+        qDebug() << "Video and audio successfully downloaded and combined!";
+        process->deleteLater();
+    });
+
+    process->start();
 }
 
 void MainWindow::fetchVideoDetails(const QString &videoUrl) {
@@ -249,7 +307,8 @@ void MainWindow::fetchVideoDetails(const QString &videoUrl) {
             QFont font("Arial", 14, QFont::Bold);
             ui->l_vid_title->setFont(font);
             ui->l_vid_title->setText(output);
-            videoTitle = output;
+            QString f_videoTitle = output;
+            videoTitle = f_videoTitle.replace(" ", "-");
         } else {
             qDebug() << "Failed to fetch title!";
         }
@@ -262,16 +321,12 @@ void MainWindow::fetchVideoDetails(const QString &videoUrl) {
 QString MainWindow::getUrlType(const QString &videoUrl) {
     QUrl url(videoUrl);
     QUrlQuery query(url);
-
+    QString path = url.path();
     if (query.hasQueryItem("list")) {
         return "playlist";
-    }
-
-    QString path = url.path();
-    if (path.contains("/channel/") || path.contains("/c/") || path.contains("/user/")) {
+    } else if (path.contains("/channel/") || path.contains("/c/") || path.contains("/user/")) {
         return "channel";
     }
-
     return "video";
 }
 
