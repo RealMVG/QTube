@@ -150,19 +150,12 @@
     <property name="geometry">
      <rect>
       <x>280</x>
-      <y>400</y>
+      <y>423</y>
       <width>221</width>
-      <height>114</height>
+      <height>91</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout_2">
-     <item>
-      <widget class="QCheckBox" name="cb_audioOnly">
-       <property name="text">
-        <string>Audio Only?</string>
-       </property>
-      </widget>
-     </item>
      <item>
       <widget class="QComboBox" name="comboBoxFormats">
        <property name="editable">

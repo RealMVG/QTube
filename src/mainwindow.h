@@ -36,6 +36,7 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
     QMap<QString, QString> formatMap;
+    QString videoTitle;
 
 private slots:
     void on_searchButton_pressed();

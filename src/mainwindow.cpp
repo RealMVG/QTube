@@ -27,21 +27,36 @@ MainWindow::~MainWindow()
 }
 
 void MainWindow::on_b_download_pressed() {
+    disconnect(ui->b_download, &QPushButton::pressed, this, &MainWindow::on_b_download_pressed);
     QProcess *downloadProcess = new QProcess(this);
 
     downloadProcess->setProgram("yt-dlp");
-    // If yt-dlp is not in system PATH, describe full path.
+    // Если yt-dlp не в системном PATH, укажите полный путь.
     // downloadProcess->setProgram("C:/path/to/yt-dlp.exe");
 
     QString videoUrl = ui->e_inputUrl->text();
-    QString savePath = QFileDialog::getSaveFileName(this, "Save Video", "", "All Files (*)");
+    QString savePath = QFileDialog::getSaveFileName(this, "Save Video", videoTitle, "All Files (*)");
+
     QString selectedFormat = ui->comboBoxFormats->currentText();
-    bool isAudioOnly = ui->cb_audioOnly->isChecked();
 
     QString formatId = extractFormatId(selectedFormat);
     if (formatId.isEmpty()) {
         qDebug() << "No valid format selected!";
         return;
+    }
+
+    if (savePath.isEmpty()) {
+        savePath = "video";
+    }
+
+    if (!savePath.contains(".")) {
+        if (selectedFormat.contains("mp4")) {
+            savePath += ".mp4";
+        } else if (selectedFormat.contains("webm")) {
+            savePath += ".webm";
+        } else {
+            savePath += ".mp4";
+        }
     }
 
     QStringList arguments;
@@ -51,6 +66,7 @@ void MainWindow::on_b_download_pressed() {
               << savePath
               << videoUrl
               << "--quiet";
+
     qDebug() << "Arguments:" << arguments;
 
     downloadProcess->setArguments(arguments);
@@ -62,7 +78,6 @@ void MainWindow::on_b_download_pressed() {
         QByteArray output = downloadProcess->readAllStandardOutput();
         QString outputStr(output);
 
-        // Простая проверка на прогресс
         if (outputStr.contains("%")) {
             QStringList parts = outputStr.split(" ");
             for (const QString &part : parts) {
@@ -234,6 +249,7 @@ void MainWindow::fetchVideoDetails(const QString &videoUrl) {
             QFont font("Arial", 14, QFont::Bold);
             ui->l_vid_title->setFont(font);
             ui->l_vid_title->setText(output);
+            videoTitle = output;
         } else {
             qDebug() << "Failed to fetch title!";
         }
