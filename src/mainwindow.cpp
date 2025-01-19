@@ -15,6 +15,7 @@ MainWindow::MainWindow(QWidget *parent)
 #else
     qDebug() << "Program successfully started on Unix type system!";
 #endif
+    this->setWindowTitle("QTube - YouTube Video Downloader");
 
     ui->downloadButton->hide();
     ui->comboBoxFormats->hide();
@@ -82,7 +83,6 @@ void MainWindow::on_downloadButton_pressed() {
 }
 
 void MainWindow::handleProgress() {
-    double lastProgress = 0;
     QProcess *downloadProcess = qobject_cast<QProcess *>(sender());
     if (!downloadProcess) return;
 
@@ -131,6 +131,14 @@ void MainWindow::downloadFinished(int exitCode, QProcess::ExitStatus exitStatus)
 void MainWindow::on_searchButton_pressed() {
     disconnect(ui->searchButton, &QPushButton::pressed, this, &MainWindow::on_searchButton_pressed);
     QString videoUrl = ui->e_inputUrl->text();
+
+    if (videoUrl.isEmpty()) {
+        qDebug() << "Error: URL is empty!";
+        statusBar()->showMessage("Error: URL is empty!");
+        connect(ui->searchButton, &QPushButton::pressed, this, &MainWindow::on_searchButton_pressed);
+        return;
+    }
+
     QString urlType = getUrlType(videoUrl);
 
     statusBar()->showMessage("Searching...");
@@ -260,7 +268,6 @@ void MainWindow::fetchAvailableFormats(const QString &videoUrl) {
 
         formatProcess->deleteLater();
     });
-
     formatProcess->start();
 }
 
@@ -351,8 +358,9 @@ void MainWindow::fetchVideoDetails(const QString &videoUrl) {
             QString f_videoTitle = output;
 
             QFont font = ui->l_vid_title->font();
-            font.setPointSize(16);
+            font.setPointSize(24);
             ui->l_vid_title->setFont(font);
+            ui->l_vid_title->setStyleSheet("font-size: 24px;");
 
             videoTitle = f_videoTitle.replace(" ", "-");
         } else {

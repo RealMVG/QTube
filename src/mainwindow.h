@@ -51,10 +51,10 @@ private slots:
     void on_downloadButton_pressed();
 
 private:
+    double lastProgress = 0.0;
     Ui::MainWindow *ui;
     QString extractFormatId(const QString &selectedFormat);
     QString getUrlType(const QString &videoUrl);
-    QString getYTDLPPath();
 };
 
 #endif // MAINWINDOW_H
