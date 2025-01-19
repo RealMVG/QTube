@@ -1,3 +1,46 @@
-# QTube
+# QTube - YouTube Video Downloader 🎥
 
-QTube is a YouTube video downloader based on yt-dlp. It allows users to download videos and audio in various formats and qualities.
+QTube is a simple, fast, and reliable service for downloading YouTube videos in various formats. It provides a user-friendly interface and allows users to save their favorite videos for offline viewing. 🚀
+
+## Features ✨
+
+- **Download Videos**: Download videos in different formats (MP4, MP3, etc.).
+- **Quality Options**: Choose the quality of the video before downloading.
+- **Multiple File Formats**: Supports downloading videos as MP4, MP3, and other common formats.
+- **Fast Downloading**: Optimized for quick video downloads.
+- **Lightweight**: A minimalistic and easy-to-use interface with no unnecessary clutter.
+
+## Installation ⚙️
+
+1. Download the latest release from the [QTube releases page](https://github.com/RealMVG/QTube/releases).
+2. Extract the contents of the release to a folder on your computer.
+3. Install **yt-dlp** and add it to your system's PATH. You can download it from the official repository: [yt-dlp GitHub](https://github.com/yt-dlp/yt-dlp).
+
+## Usage 💡
+
+1. Open the QTube application.
+2. Paste the URL of the YouTube video you want to download.
+3. Select the desired video quality and format.
+4. Click the "Download" button, and the video will be saved to your computer.
+
+## Supported Formats 🎶
+
+- **MP4**: Video format with varying qualities (1080p, 720p, 480p, etc.)
+- **MP3**: Audio format for extracting the sound from videos.
+
+## License 📝
+
+QTube is open-source and available under the MIT License.
+
+## Credits 🙌
+
+- **yt-dlp**: For handling YouTube video downloading and processoring.
+
+## Troubleshooting 🛠️
+
+If you encounter any issues, check the following:
+
+- Ensure that **yt-dlp** is correctly installed and added to your PATH.
+- Make sure the YouTube URL is valid.
+- If you experience slow downloads, try a different network.
+
