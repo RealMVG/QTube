@@ -294,84 +294,88 @@ void MainWindow::downloadAndCombine(const QString &videoUrl, const QString &vide
 }
 
 void MainWindow::fetchVideoDetails(const QString &videoUrl) {
+    QProcess *process = new QProcess(this);
+    process->setProgram("yt-dlp");
+    process->setArguments(QStringList() << "--quiet"
+                                        << "--print"
+                                        << "title,thumbnail,uploader,view_count,upload_date"
+                                        << "--encoding"
+                                        << "utf-8"
+                                        << videoUrl);
 
-    QProcess *thumbnailProcess = new QProcess(this);
-
-    thumbnailProcess->setProgram("yt-dlp");
-    thumbnailProcess->setArguments(QStringList() << "--quiet"
-                                                 << "--list-thumbnails"
-                                                 << videoUrl);
-
-    connect(thumbnailProcess, &QProcess::finished, this, [this, thumbnailProcess](int exitCode, QProcess::ExitStatus exitStatus) {
+    connect(process, &QProcess::finished, this, [this, process](int exitCode, QProcess::ExitStatus exitStatus) {
         if (exitStatus == QProcess::CrashExit) {
-            qDebug() << "yt-dlp crashed while fetching thumbnails!";
-            thumbnailProcess->deleteLater();
+            qDebug() << "yt-dlp crashed while fetching video details!";
+            process->deleteLater();
             return;
         }
 
-        QString output = thumbnailProcess->readAllStandardOutput().trimmed();
-        QStringList outputLines = output.split("\n");
+        QString output = process->readAllStandardOutput();
+        QStringList details = output.split('\n');
 
-        QString thumbnailUrl;
-        for (const QString &line : outputLines) {
-            if (line.contains("maxresdefault.jpg")) {
-                QStringList parts = line.split(" ");
-                thumbnailUrl = parts.last().trimmed();
-                break;
+        if (details.size() >= 5) {
+            QString title = details.at(0).trimmed();
+            QString thumbnailUrl = details.at(1).trimmed();
+            QString uploaderName = details.at(2).trimmed();
+            QString viewCountStr = details.at(3).trimmed();
+            QString uploadDateStr = details.at(4).trimmed();
+
+            videoTitle = title;
+            videoTitle.replace(" ", "-");
+
+            qDebug() << "Video title:" << title;
+            qDebug() << "Thumbnail URL:" << thumbnailUrl;
+            qDebug() << "Uploader name:" << uploaderName;
+            qDebug() << "View count:" << viewCountStr;
+            qDebug() << "Upload date:" << uploadDateStr;
+
+            ui->videoTitleLabel->setStyleSheet("font-size: 18px;");
+            ui->chNameLabel->setText(uploaderName);
+            ui->videoTitleLabel->setText(title);
+
+            if (!viewCountStr.isEmpty()) {
+                ui->chViewsLabel->setText("Views: " + viewCountStr);
+            } else {
+                ui->chViewsLabel->setText("Error: View count is empty!");
+                qDebug() << "Error: View count is empty!";
             }
-        }
 
-        if (!thumbnailUrl.isEmpty()) {
-            qDebug() << "Found maxresdefault thumbnail URL:" << thumbnailUrl;
-            QUrl imageUrl(thumbnailUrl);
-            loadImage(imageUrl);
+            if (!uploadDateStr.isEmpty()) {
+                QDate date = QDate::fromString(uploadDateStr, "yyyyMMdd");
 
+                if (!date.isValid()) {
+                    date = QDate::fromString(uploadDateStr, "yyyy-MM-dd");
+                }
+
+                if (date.isValid()) {
+                    ui->chDateLabel->setText("Uploaded: " + date.toString("yyyy/MM/dd"));
+                } else {
+                    ui->chDateLabel->setText("Error: Invalid upload date format!");
+                    qDebug() << "Error: Invalid upload date format!";
+                }
+            } else {
+                ui->chDateLabel->setText("Error: Upload date is empty!");
+                qDebug() << "Error: Upload date is empty!";
+            }
+
+            if (!thumbnailUrl.isEmpty()) {
+                loadImage(QUrl(thumbnailUrl));
+            } else {
+                ui->imageLabel->setText("Error: Thumbnail URL is empty!");
+                qDebug() << "Error: Thumbnail URL is empty!";
+            }
         } else {
-            qDebug() << "maxresdefault thumbnail not found!";
+            qDebug() << "Error: Unable to fetch all required details!";
         }
-        thumbnailProcess->deleteLater();
+
+        process->deleteLater();
     });
 
-    thumbnailProcess->start();
-
-    QProcess *titleProcess = new QProcess(this);
-
-    titleProcess->setProgram("yt-dlp");
-    titleProcess->setArguments(QStringList() << "--quiet"
-                                             << "--print"
-                                             << "title"
-                                             << "--encoding" << "utf-8"
-                                             << videoUrl);
-
-    connect(titleProcess, &QProcess::finished, this, [this, titleProcess](int exitCode, QProcess::ExitStatus exitStatus) {
-        if (exitStatus == QProcess::CrashExit) {
-            qDebug() << "yt-dlp crashed while fetching video title!";
-            titleProcess->deleteLater();
-            return;
-        }
-
-        QString output = titleProcess->readAllStandardOutput().trimmed();
-        if (!output.isEmpty()) {
-            qDebug() << "Video title:" << output;
-
-            ui->l_vid_title->setText(output);
-            QString f_videoTitle = output;
-
-            QFont font = ui->l_vid_title->font();
-            font.setPointSize(24);
-            ui->l_vid_title->setFont(font);
-            ui->l_vid_title->setStyleSheet("font-size: 24px;");
-
-            videoTitle = f_videoTitle.replace(" ", "-");
-        } else {
-            qDebug() << "Failed to fetch title!";
-        }
-
-        titleProcess->deleteLater();
-    });
-
-    titleProcess->start();
+    process->start();
 }
+
+
+
 QString MainWindow::getUrlType(const QString &videoUrl) {
     QUrl url(videoUrl);
     QUrlQuery query(url);

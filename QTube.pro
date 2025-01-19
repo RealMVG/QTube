@@ -18,16 +18,15 @@ HEADERS += \
 FORMS += \
     src/mainwindow.ui
 
-RESOURCES += resources.qrc
+RESOURCES += resources/resources.qrc
 
 TRANSLATIONS += \
-    i18n/QTube_uk_UA.ts
+    resources/i18n/QTube_uk_UA.ts
 
 CONFIG += lrelease
 CONFIG += embed_translations
 
 
 target.path = bin
-
 
 !isEmpty(target.path): INSTALLS += target

@@ -35,7 +35,7 @@ QTube is open-source and available under the MIT License.
 
 ## Credits 🙌
 
-- **yt-dlp**: For handling YouTube video downloading and processoring.
+- **yt-dlp**: For handling YouTube video downloading and processing.
 
 ## Troubleshooting 🛠️
 
@@ -44,4 +44,10 @@ If you encounter any issues, check the following:
 - Ensure that **yt-dlp** is correctly installed and added to your PATH.
 - Make sure the YouTube URL is valid.
 - If you experience slow downloads, try a different network.
+
+### Project Background 🌱
+
+QTube was developed as part of the **NewGeneration** course assignment. The task was to create software for downloading YouTube videos, with the added functionality to download entire channels and playlists, and to separate music tracks. The goal was to not only develop the core functionality but also to design a pleasant and attractive interface with additional useful features.
+
+**Assignment by**: @rtkachuk
 
