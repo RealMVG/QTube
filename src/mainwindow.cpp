@@ -15,8 +15,12 @@ MainWindow::MainWindow(QWidget *parent)
 #else
     qDebug() << "Program successfully started on Unix type system!";
 #endif
+
+    ui->downloadButton->hide();
+    ui->comboBoxFormats->hide();
+
     QUrl imageUrl("http://qt.digia.com/Documents/1/QtLogo.png");
-    connect(ui->b_download, &QPushButton::pressed, this, &MainWindow::on_b_download_pressed);
+    connect(ui->downloadButton, &QPushButton::pressed, this, &MainWindow::on_downloadButton_pressed);
     connect(ui->searchButton, &QPushButton::pressed, this, &MainWindow::on_searchButton_pressed);
 }
 
@@ -25,13 +29,21 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::on_b_download_pressed() {
-    disconnect(ui->b_download, &QPushButton::pressed, this, &MainWindow::on_b_download_pressed);
+void MainWindow::on_downloadButton_pressed() {
+    disconnect(ui->downloadButton, &QPushButton::pressed, this, &MainWindow::on_downloadButton_pressed);
+    qDebug() << "Download button pressed!";
+
     QProcess *downloadProcess = new QProcess(this);
     downloadProcess->setProgram("yt-dlp");
 
     QString videoUrl = ui->e_inputUrl->text();
     QString savePath = QFileDialog::getSaveFileName(this, "Save Video", videoTitle, "All Files (*)");
+
+    if (savePath.isEmpty()) {
+        qDebug() << "Download canceled, no file selected!";
+        connect(ui->downloadButton, &QPushButton::pressed, this, &MainWindow::on_downloadButton_pressed);
+        return;
+    }
 
     QString selectedFormat = ui->comboBoxFormats->currentText();
     QString formatId = extractFormatId(selectedFormat);
@@ -56,63 +68,74 @@ void MainWindow::on_b_download_pressed() {
     }
 
     QStringList arguments;
-    arguments << "-f"
-              << formatId
-              << "--output"
-              << savePath
+    arguments << "-f" << formatId
+              << "--output" << savePath
               << videoUrl
+              << "--progress"
               << "--quiet";
-
-    qDebug() << "Arguments:" << arguments;
-
     downloadProcess->setArguments(arguments);
 
-    ui->progressSlider->setRange(0, 100);
-    ui->progressSlider->setValue(0);
-
-    connect(downloadProcess, &QProcess::readyReadStandardOutput, this, [this, downloadProcess]() {
-        QByteArray output = downloadProcess->readAllStandardOutput();
-        QString outputStr(output);
-
-        if (outputStr.contains("%")) {
-            QStringList parts = outputStr.split(" ");
-            for (const QString &part : parts) {
-                if (part.endsWith("%")) {
-                    bool ok;
-                    int progress = part.left(part.length() - 1).toInt(&ok);
-                    if (ok) {
-                        ui->progressSlider->setValue(progress);
-                        qDebug() << "Download progress:" << progress << "%";
-                    }
-                }
-            }
-        }
-    });
-
-    connect(downloadProcess, &QProcess::finished, this, [this, downloadProcess](int exitCode, QProcess::ExitStatus exitStatus) {
-        if (exitStatus == QProcess::CrashExit) {
-            qDebug() << "yt-dlp crashed!";
-        } else {
-            qDebug() << "Download finished with exit code:" << exitCode;
-        }
-
-        QByteArray errorOutput = downloadProcess->readAllStandardError();
-        if (!errorOutput.isEmpty()) {
-            qDebug() << "Error output:" << errorOutput;
-        }
-
-        downloadProcess->deleteLater();
-    });
+    connect(downloadProcess, &QProcess::readyReadStandardOutput, this, &MainWindow::handleProgress);
+    connect(downloadProcess, &QProcess::finished, this, &MainWindow::downloadFinished);
 
     downloadProcess->start();
 }
+
+void MainWindow::handleProgress() {
+    double lastProgress = 0;
+    QProcess *downloadProcess = qobject_cast<QProcess *>(sender());
+    if (!downloadProcess) return;
+
+    QByteArray output = downloadProcess->readAllStandardOutput();
+    QString outputStr = QString::fromUtf8(output);
+
+    QRegularExpression progressRegex(R"(\s*(\d+(\.\d+)?)%)");
+    QRegularExpressionMatch match = progressRegex.match(outputStr);
+
+    if (match.hasMatch()) {
+        double progress = match.captured(1).toDouble();
+
+        if (qAbs(progress - lastProgress) >= 1.0) {
+            lastProgress = progress;
+
+            int step = (progress >= 100.0) ? 2 : 1;
+            QString progressMessage = QString("(%1/2) Downloading: %2%").arg(step).arg(static_cast<int>(progress));
+            statusBar()->showMessage(progressMessage);
+        }
+    }
+}
+
+void MainWindow::downloadFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+    QProcess *downloadProcess = qobject_cast<QProcess *>(sender());
+    if (!downloadProcess) return;
+
+    if (exitStatus == QProcess::CrashExit) {
+        qDebug() << "yt-dlp crashed!";
+        statusBar()->showMessage("Download failed: yt-dlp crashed!");
+    } else {
+        qDebug() << "Download finished with exit code:" << exitCode;
+        statusBar()->showMessage("Download complete!");
+    }
+
+    QByteArray errorOutput = downloadProcess->readAllStandardError();
+    if (!errorOutput.isEmpty()) {
+        qDebug() << "Error output:" << errorOutput;
+    }
+
+    downloadProcess->deleteLater();
+    Sleep(1000);
+    statusBar()->clearMessage();
+    connect(ui->downloadButton, &QPushButton::pressed, this, &MainWindow::on_downloadButton_pressed);
+}
+
 void MainWindow::on_searchButton_pressed() {
     disconnect(ui->searchButton, &QPushButton::pressed, this, &MainWindow::on_searchButton_pressed);
-
     QString videoUrl = ui->e_inputUrl->text();
     QString urlType = getUrlType(videoUrl);
 
-    qDebug() << "URL type = "<< urlType;
+    statusBar()->showMessage("Searching...");
+
+    qDebug() << "URL type = " << urlType;
 
     if (urlType == "video") {
         fetchVideoDetails(videoUrl);
@@ -129,6 +152,7 @@ void MainWindow::on_searchButton_pressed() {
 }
 
 void MainWindow::fetchAvailableFormats(const QString &videoUrl) {
+
     QProcess *formatProcess = new QProcess(this);
     formatProcess->setProgram("yt-dlp");
     formatProcess->setArguments(QStringList() << "-F" << videoUrl);
@@ -142,6 +166,8 @@ void MainWindow::fetchAvailableFormats(const QString &videoUrl) {
 
         QString output = formatProcess->readAllStandardOutput().trimmed();
         QStringList outputLines = output.split("\n");
+
+        statusBar()->clearMessage();
 
         QStringList formats;
         QMap<QString, QString> videoFormats;
@@ -181,10 +207,27 @@ void MainWindow::fetchAvailableFormats(const QString &videoUrl) {
                 }
             }
         }
+        auto resolutionComparator = [](const QString &a, const QString &b) {
+            QStringList resA = a.split("x");
+            QStringList resB = b.split("x");
+
+            if (resA.size() < 2 || resB.size() < 2)
+                return false;
+
+            int widthA = resA[0].toInt();
+            int heightA = resA[1].toInt();
+            int widthB = resB[0].toInt();
+            int heightB = resB[1].toInt();
+
+            if (widthA != widthB)
+                return widthA > widthB;
+            return heightA > heightB;
+        };
 
         QStringList videoKeys = videoFormats.keys();
         QStringList audioKeys = audioFormats.keys();
-        std::sort(videoKeys.begin(), videoKeys.end());
+
+        std::sort(videoKeys.begin(), videoKeys.end(), resolutionComparator);
         std::sort(audioKeys.begin(), audioKeys.end());
 
         if (!videoKeys.isEmpty() && !audioKeys.isEmpty()) {
@@ -210,8 +253,7 @@ void MainWindow::fetchAvailableFormats(const QString &videoUrl) {
                     formatMap[combinedFormat] = videoFormats[videoKey] + "+" + audioFormats[audioKey];
                 }
             }
-
-            ui->comboBoxFormats->addItems(formats); // Заполняем ComboBox
+            ui->comboBoxFormats->addItems(formats);
         } else {
             qDebug() << "No valid video or audio formats found for this video!";
         }
@@ -221,9 +263,6 @@ void MainWindow::fetchAvailableFormats(const QString &videoUrl) {
 
     formatProcess->start();
 }
-
-
-
 
 void MainWindow::downloadAndCombine(const QString &videoUrl, const QString &videoId, const QString &audioId) {
     QProcess *process = new QProcess(this);
@@ -248,7 +287,9 @@ void MainWindow::downloadAndCombine(const QString &videoUrl, const QString &vide
 }
 
 void MainWindow::fetchVideoDetails(const QString &videoUrl) {
+
     QProcess *thumbnailProcess = new QProcess(this);
+
     thumbnailProcess->setProgram("yt-dlp");
     thumbnailProcess->setArguments(QStringList() << "--quiet"
                                                  << "--list-thumbnails"
@@ -277,16 +318,17 @@ void MainWindow::fetchVideoDetails(const QString &videoUrl) {
             qDebug() << "Found maxresdefault thumbnail URL:" << thumbnailUrl;
             QUrl imageUrl(thumbnailUrl);
             loadImage(imageUrl);
+
         } else {
             qDebug() << "maxresdefault thumbnail not found!";
         }
-
         thumbnailProcess->deleteLater();
     });
 
     thumbnailProcess->start();
 
     QProcess *titleProcess = new QProcess(this);
+
     titleProcess->setProgram("yt-dlp");
     titleProcess->setArguments(QStringList() << "--quiet"
                                              << "--print"
@@ -304,10 +346,14 @@ void MainWindow::fetchVideoDetails(const QString &videoUrl) {
         QString output = titleProcess->readAllStandardOutput().trimmed();
         if (!output.isEmpty()) {
             qDebug() << "Video title:" << output;
-            QFont font("Arial", 14, QFont::Bold);
-            ui->l_vid_title->setFont(font);
+
             ui->l_vid_title->setText(output);
             QString f_videoTitle = output;
+
+            QFont font = ui->l_vid_title->font();
+            font.setPointSize(16);
+            ui->l_vid_title->setFont(font);
+
             videoTitle = f_videoTitle.replace(" ", "-");
         } else {
             qDebug() << "Failed to fetch title!";
@@ -360,6 +406,8 @@ void MainWindow::loadImage(const QUrl &imageUrl) {
         ui->imageLabel->setText("Error: Wrong URL");
         qDebug() << "Error: Wrong URL";
     }
+    ui->downloadButton->show();
+    ui->comboBoxFormats->show();
 }
 
 QString MainWindow::extractFormatId(const QString &selectedFormat) {

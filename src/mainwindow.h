@@ -8,6 +8,7 @@
 #include <QUrl>
 #include <QFile>
 #include <QPixmap>
+#include <QThread>
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 #include <QNetworkReply>
@@ -19,8 +20,8 @@
 #include <QSlider>
 #include <QMessageBox>
 #include <QProgressBar>
+#include <QTimer>
 #include <QStatusBar>
-
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -42,16 +43,18 @@ public:
 private slots:
     void on_searchButton_pressed();
     void fetchVideoDetails(const QString &videoUrl);
+    void downloadFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void handleProgress();
     void loadImage(const QUrl &imageUrl);
     void downloadAndCombine(const QString &videoUrl, const QString &videoId, const QString &audioId);
     void fetchAvailableFormats(const QString &videoUrl);
-    void on_b_download_pressed();
-
+    void on_downloadButton_pressed();
 
 private:
     Ui::MainWindow *ui;
     QString extractFormatId(const QString &selectedFormat);
     QString getUrlType(const QString &videoUrl);
-    QProgressBar *progressBar;
+    QString getYTDLPPath();
 };
+
 #endif // MAINWINDOW_H

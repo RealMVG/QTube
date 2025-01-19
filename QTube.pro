@@ -18,6 +18,8 @@ HEADERS += \
 FORMS += \
     src/mainwindow.ui
 
+RESOURCES += resources.qrc
+
 TRANSLATIONS += \
     i18n/QTube_uk_UA.ts
 
